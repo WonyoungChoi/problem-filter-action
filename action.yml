@@ -1,0 +1,16 @@
+name: 'Problem Filter'
+description: 'Filters the warning or error messages printed on stdout'
+inputs:
+  shell:
+    description: 'shell command to execute'
+    required: true
+  type:
+    description: 'Problem-matcher type'
+    required: true
+    default: 'dotnet'
+  files:
+    description: 'JSON array of files to print'
+    required: false
+runs:
+  using: 'node12'
+  main: 'dist/index.js'
