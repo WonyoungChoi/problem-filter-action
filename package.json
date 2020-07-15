@@ -4,9 +4,9 @@
   "description": "Filters the warning or error messages printed on stdout.",
   "main": "index.js",
   "scripts": {
-    "lint": "eslint index.js",
+    "lint": "eslint index.js exec.js",
     "package": "ncc build index.js -o dist",
-    "test": "eslint index.js && jest"
+    "test": "eslint index.js exec.js && jest"
   },
   "repository": {
     "type": "git",
@@ -24,7 +24,6 @@
   "homepage": "https://github.com/WonyoungChoi/problem-filter-action#readme",
   "dependencies": {
     "@actions/core": "^1.1.1",
-    "@actions/exec": "^1.0.4",
     "@actions/github": "^4.0.0"
   },
   "devDependencies": {

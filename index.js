@@ -1,20 +1,17 @@
+const path = require('path');
 const core = require('@actions/core');
-const exec = require('@actions/exec');
+const exec = require('./exec');
 
 const PROBLEM_MATCHERS = {
   dotnet: {
     // eslint-disable-next-line max-len
     regexp: '^([^\\s].*)\\((\\d+)(?:,\\d+|,\\d+,\\d+)?\\):\\s+(error|warning)\\s+([a-zA-Z]+(?<!MSB)\\d+):\\s*(.*?)\\s+\\[(.*?)\\]$',
     file: 1,
-  },
-  python: {
-    regexp: '^\\s*File\\s\\\"(.*)\\\",\\sline\\s(\\d+),\\sin\\s(.*)$',
-    file: 1,
-  },
-  node: {
-    // eslint-disable-next-line max-len
-    regexp: '^(?:\\s+\\d+\\>)?([^\\s].*)\\((\\d+|\\d+,\\d+|\\d+,\\d+,\\d+,\\d+)\\)\\s*:\\s+(error|warning|info)\\s+(\\w{1,2}\\d+)\\s*:\\s*(.*)$',
-    file: 1,
+    line: 2,
+    severity: 3,
+    code: 4,
+    message: 5,
+    fromPath: 6,
   },
 };
 
@@ -22,8 +19,9 @@ const PROBLEM_MATCHERS = {
  * Filter out warning or error messages output to stdout
  */
 async function run() {
+  let errors = '';
   try {
-    const shell = core.getInput('shell');
+    const commands = core.getInput('run').split(/\r?\n/);
     const type = core.getInput('type');
     const files = core.getInput('files');
 
@@ -39,30 +37,49 @@ async function run() {
       throw new Error(`not supported problem matcher type: ${type}`);
     }
 
-    // make a filter
+    // execute command
     const re = new RegExp(matcher['regexp']);
-    const filter = (line) => {
-      const match = re.exec(line);
-      if (match) {
-        if (changedFiles.length > 0) {
-          if (changedFiles.includes(match[matcher['file']])) {
+    for (const cmd of commands) {
+      const ret = await exec(cmd.trim(), {env: process.env}, (line) => {
+        const match = re.exec(line);
+        if (match) {
+          if (changedFiles.includes(getMatchedFile(matcher, match))) {
             console.log(line);
           }
+          const severity = match[matcher['severity']];
+          if (severity === 'error') {
+            errors += line;
+          }
+        } else {
+          console.log(line);
         }
-      } else {
-        console.log(line);
+      });
+      if (ret !== 0) {
+        throw new Error(`run process exited with code ${ret}`);
       }
-    };
-
-    // execute shell
-    const cmdarr = shell.split(/\s+/);
-    await exec.exec(cmdarr[0], cmdarr.slice(1), {silent: true, listeners: {
-      stdline: filter,
-      errline: filter,
-    }});
+    }
   } catch (error) {
     core.setFailed(error.message);
+    console.error(error);
   }
+
+  if (errors) {
+    core.setOutput('errors', errors);
+  }
+}
+
+function getMatchedFile(matcher, match) {
+  const fileIdx = matcher['file'];
+  const fromPathIdx = matcher['fromPath'];
+
+  let file = match[fileIdx];
+  if (fromPathIdx) {
+    const fromPathDir = path.dirname(match[fromPathIdx]);
+    const baseDir = path.relative(process.env['GITHUB_WORKSPACE'], fromPathDir);
+    file = path.join(baseDir, file);
+  }
+
+  return file;
 }
 
 run();
