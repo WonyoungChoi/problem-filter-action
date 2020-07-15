@@ -1,5 +1,5 @@
 name: 'Problem Filter'
-description: 'Filters the warning or error messages printed on stdout'
+description: 'Filter out warning or error messages output to stdout using specific conditions'
 inputs:
   shell:
     description: 'shell command to execute'
